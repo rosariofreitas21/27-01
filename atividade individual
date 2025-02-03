@@ -1,0 +1,96 @@
+int main()
+{
+    stdio_init_all();
+
+    while (true) {
+        printf("Hello, world!\n");
+        sleep_ms(1000);
+    }
+}
+
+export PICO_SDK_PATH=~/pico-sdk
+
+void debounce_button(uint gpio, uint32_t events) {
+    static uint32_t last_interrupt_time = 0;
+    uint32_t current_time = time_us_32();
+    
+    if (current_time - last_interrupt_time > 200000) { // 200ms de debounce
+        if (gpio == BUTTON_A_PIN) {
+            button_a_pressed = true;
+        } else if (gpio == BUTTON_B_PIN) {
+            button_b_pressed = true;
+        }
+    }
+    last_interrupt_time = current_time;
+}
+void setup_gpio_interrupts() {
+    gpio_set_irq_enabled_with_callback(BUTTON_A_PIN, GPIO_IRQ_EDGE_FALL, true, debounce_button);
+    gpio_set_irq_enabled_with_callback(BUTTON_B_PIN, GPIO_IRQ_EDGE_FALL, true, debounce_button);
+}
+void update_counter() {
+    if (button_a_pressed) {
+        counter++;
+        if (counter > 9) counter = 0; // Limite de 0 a 9
+        button_a_pressed = false;
+    }
+    if (button_b_pressed) {
+        counter--;
+        if (counter < 0) counter = 9; // Limite de 0 a 9
+        button_b_pressed = false;
+    }
+}
+void display_number_on_matrix(int num) {
+    // Exemplo simplificado para exibir os números 0 a 9 em uma matriz 5x5
+    uint32_t led_pattern[] = {
+        0b11111000000000000000000000, // 0
+        0b00000100000000000000000000, // 1
+        0b11100100000000000000000000, // 2
+        0b11001100000000000000000000, // 3
+        0b00101100000000000000000000, // 4
+        0b11011000000000000000000000, // 5
+        0b11111000000000000000000000, // 6
+        0b00000100000000000000000000, // 7
+        0b11111100000000000000000000, // 8
+        0b11011100000000000000000000  // 9
+    };
+    // Use a função para acionar a matriz WS2812 com o padrão de LEDs
+    WS2812_show_leds(led_pattern[num]);
+}
+int main() {
+    // Configuração dos pinos
+    gpio_init(LED_RGB_R_PIN);
+    gpio_set_dir(LED_RGB_R_PIN, GPIO_OUT);
+    
+    gpio_init(LED_RGB_G_PIN);
+    gpio_set_dir(LED_RGB_G_PIN, GPIO_OUT);
+    
+    gpio_init(LED_RGB_B_PIN);
+    gpio_set_dir(LED_RGB_B_PIN, GPIO_OUT);
+    
+    gpio_init(BUTTON_A_PIN);
+    gpio_set_dir(BUTTON_A_PIN, GPIO_IN);
+    gpio_pull_up(BUTTON_A_PIN);
+    
+    gpio_init(BUTTON_B_PIN);
+    gpio_set_dir(BUTTON_B_PIN, GPIO_IN);
+    gpio_pull_up(BUTTON_B_PIN);
+
+    // Inicialização do WS2812
+    WS2812_init(LED_MATRIX_PIN, 25);  // Tamanho da matriz 5x5
+
+    // Configuração das interrupções
+    setup_gpio_interrupts();
+    
+    // Configuração do tempo
+    set_sys_clock_khz(133000, true); // Definir o clock do sistema
+
+    // Loop principal
+    while (true) {
+        update_counter(); // Atualiza o contador
+        display_number_on_matrix(counter); // Exibe o número na matriz
+        led_rgb_blink(); // Faz o LED RGB piscar
+        sleep_ms(200); // Espera um pouco antes de reiniciar
+    }
+
+    return 0;
+}
